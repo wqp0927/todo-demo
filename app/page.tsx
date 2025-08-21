@@ -9,39 +9,30 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Plus, Trash2, CheckCircle2, Circle } from "lucide-react"
+import { Plus, Trash2, CheckCircle2, Circle, Loader2, AlertCircle } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
-
-interface Task {
-  id: number
-  text: string
-  completed: boolean
-  createdAt: Date
-}
+import { useTodos } from "@/lib/hooks/useTodos"
 
 export default function TodoApp() {
-  const [tasks, setTasks] = useState<Task[]>([])
+  const { tasks, loading, error, addTask, toggleTask, deleteTask } = useTodos()
   const [newTask, setNewTask] = useState("")
+  const [isAdding, setIsAdding] = useState(false)
 
-  const addTask = () => {
-    if (newTask.trim() !== "") {
-      const task: Task = {
-        id: Date.now(),
-        text: newTask.trim(),
-        completed: false,
-        createdAt: new Date(),
-      }
-      setTasks([task, ...tasks])
+  const handleAddTask = async () => {
+    if (newTask.trim() !== "" && !isAdding) {
+      setIsAdding(true)
+      await addTask(newTask.trim())
       setNewTask("")
+      setIsAdding(false)
     }
   }
 
-  const toggleTask = (id: number) => {
-    setTasks(tasks.map((task) => (task.id === id ? { ...task, completed: !task.completed } : task)))
+  const handleToggleTask = async (id: string) => {
+    await toggleTask(id)
   }
 
-  const deleteTask = (id: number) => {
-    setTasks(tasks.filter((task) => task.id !== id))
+  const handleDeleteTask = async (id: string) => {
+    await deleteTask(id)
   }
 
   const completedCount = tasks.filter((task) => task.completed).length
@@ -49,7 +40,7 @@ export default function TodoApp() {
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
-      addTask()
+      handleAddTask()
     }
   }
 
@@ -93,6 +84,18 @@ export default function TodoApp() {
           </Card>
         </div>
 
+        {/* Error Display */}
+        {error && (
+          <Card className="mb-6 shadow-lg border-0 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                <AlertCircle className="h-5 w-5" />
+                <p className="text-sm">{error}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Add Task */}
         <Card className="mb-6 shadow-lg border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
           <CardHeader>
@@ -110,12 +113,18 @@ export default function TodoApp() {
                 onChange={(e) => setNewTask(e.target.value)}
                 onKeyPress={handleKeyPress}
                 className="flex-1"
+                disabled={isAdding}
               />
               <Button
-                onClick={addTask}
+                onClick={handleAddTask}
+                disabled={isAdding || newTask.trim() === ""}
                 className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
               >
-                <Plus className="h-4 w-4 mr-2" />
+                {isAdding ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4 mr-2" />
+                )}
                 添加
               </Button>
             </div>
@@ -135,7 +144,12 @@ export default function TodoApp() {
             </div>
           </CardHeader>
           <CardContent>
-            {tasks.length === 0 ? (
+            {loading ? (
+              <div className="text-center py-12">
+                <Loader2 className="h-16 w-16 text-muted-foreground mx-auto mb-4 animate-spin" />
+                <p className="text-muted-foreground text-lg">加载中...</p>
+              </div>
+            ) : tasks.length === 0 ? (
               <div className="text-center py-12">
                 <Circle className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
                 <p className="text-muted-foreground text-lg">暂无任务</p>
@@ -155,7 +169,7 @@ export default function TodoApp() {
                       <Checkbox
                         id={`task-${task.id}`}
                         checked={task.completed}
-                        onCheckedChange={() => toggleTask(task.id)}
+                        onCheckedChange={() => handleToggleTask(task.id)}
                         className="data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
                       />
                       <label
@@ -178,7 +192,7 @@ export default function TodoApp() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => deleteTask(task.id)}
+                          onClick={() => handleDeleteTask(task.id)}
                           className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
                         >
                           <Trash2 className="h-4 w-4" />
